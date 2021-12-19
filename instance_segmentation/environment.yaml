@@ -1,0 +1,29 @@
+name: 03_instance_segmentation
+channels:
+  - defaults
+  - nvidia
+dependencies:
+  - python=3.9
+  - cudatoolkit=11.0.*
+  - cudnn=8.0.*
+  - jupyter
+  - numpy
+  - pytorch
+  - scikit-image
+  - scikit-learn
+  - pandas
+  - scipy
+  - seaborn
+  - tqdm
+  - ipython
+  - tensorboard
+  - torchvision
+  - pip
+  - pip:
+    - tensorflow==2.7
+    - csbdeep
+    - stardist
+    - stardist-napari
+    - cellpose
+    - gputools
+    - napari[all]
