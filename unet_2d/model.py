@@ -34,7 +34,7 @@ class DataWrapper(RollingSequence):
 
     def __getitem__(self, i):
         idx = self.batch(i)
-        x, y = self.X[idx], self.Y[idx]
+        x, y = [self.X[i] for i in idx], [self.Y[i] for i in idx]
         X,Y = [], [] 
         for _x, _y in zip(x,y):
             _x, _y = self.cropper([_x, _y])
@@ -56,7 +56,7 @@ class UNetConfig(Config):
         if patch_size is None: 
             patch_size = (128,)*n_dim
             
-        kwargs.setdefault("train_class_weight", (1,1))
+        kwargs.setdefault("train_class_weight", (1,) * (2 if n_channel_out==1 else n_channel_out))
         kwargs.setdefault("axes", "XY" if n_dim==2 else "ZYX")
         kwargs.setdefault("unet_kern_size", 3)
         kwargs.setdefault("n_channel_in", n_channel_in)
@@ -205,7 +205,7 @@ class UNet(CARE):
     def prepare_for_training(self, optimizer=None, **kwargs):
         tmp = self.config.train_loss 
         self.config.train_loss = 'mse'
-        optimizer = Adam(lr=self.config.train_learning_rate)
+        optimizer = Adam(self.config.train_learning_rate)
         super().prepare_for_training(optimizer=optimizer,**kwargs)
         self.config.train_loss = tmp
 
