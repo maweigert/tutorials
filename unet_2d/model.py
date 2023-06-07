@@ -56,7 +56,7 @@ class UNetConfig(Config):
             patch_size = (128,)*n_dim
             
         if train_loss is None:  
-            train_loss = "binary_crossentropy" if self.n_channel_out==1 else "categorical_crossentropy"             
+            train_loss = "binary_crossentropy" if n_channel_out==1 else "categorical_crossentropy"             
             
         kwargs.setdefault("train_class_weight", (1,) * (2 if n_channel_out==1 else n_channel_out))
         kwargs.setdefault("axes", "XY" if n_dim==2 else "ZYX")
