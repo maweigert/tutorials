@@ -285,7 +285,7 @@ class UNet(CARE):
             not IS_TF_1 and not any(isinstance(cb,CARETensorBoardImage) for cb in self.callbacks)):
             self.callbacks.append(CARETensorBoardImage(model=self.keras_model, data=(xv, yv),
                                                        log_dir=str(self.logdir/'logs'/'images'),
-                                                       n_images=3, prob_out=self.config.probabilistic),
+                                                       n_images=3, prob_out=self.config.probabilistic,
                                                        **({} if care_tb_kwargs is None else care_tb_kwargs))
 
         fit = self.keras_model.fit_generator if IS_TF_1 else self.keras_model.fit
