@@ -19,8 +19,6 @@ Adam = keras_import('optimizers', 'Adam')
 K = keras_import("backend")
 
 
-
-
 class DataWrapper(RollingSequence):
 
     def __init__(self, X, Y, batch_size, length, patch_size, augmenter=None):
@@ -49,12 +47,16 @@ class DataWrapper(RollingSequence):
 
 
 class UNetConfig(Config):
-    def __init__(self, n_dim:int=2, n_channel_in:int=1, n_channel_out:int=1, patch_size:tuple[int] = None, **kwargs):
+    def __init__(self, n_dim:int=2, n_channel_in:int=1, n_channel_out:int=1, patch_size:tuple[int] = None, 
+                 train_loss: str = None, **kwargs):
         if not n_dim in (2,3):
             raise ValueError(f"Invalid number of dimensions: {n_dim} (can be 2 or 3)")
         
         if patch_size is None: 
             patch_size = (128,)*n_dim
+            
+        if train_loss is None:  
+            train_loss = "binary_crossentropy" if self.n_channel_out==1 else "categorical_crossentropy"             
             
         kwargs.setdefault("train_class_weight", (1,) * (2 if n_channel_out==1 else n_channel_out))
         kwargs.setdefault("axes", "XY" if n_dim==2 else "ZYX")
@@ -72,7 +74,7 @@ class UNetConfig(Config):
         super().__init__(allow_new_parameters = True, **kwargs)
         self.probabilistic = False
         self.unet_residual = False
-        self.train_loss = "binary_crossentropy" if self.n_channel_out==1 else "categorical_crossentropy" 
+        self.train_loss = train_loss
         self.unet_last_activation = "sigmoid" if self.n_channel_out==1 else "softmax" 
 
     def is_valid(self, return_invalid=False):
@@ -158,18 +160,28 @@ def dice_bce(bce_weights = (1,1), dice_weight=1):
         return dice_weight*dice_loss(y_true, y_pred) + _bce(y_true, y_pred)
     return _loss
 
-def dice_cce(n_labels, cce_weights, dice_weight=1):
+# def dice_cce(n_labels, cce_weights, dice_weight=1):
+#     _cce = weighted_cce(weights=cce_weights)
+#     def _sum(a):
+#         return K.sum(a, axis=(1,2), keepdims=True)
+#     def dice_coef(y_true, y_pred):
+#         return (2 * _sum(y_true * y_pred) + K.epsilon()) / (_sum(y_true) + _sum(y_pred) + K.epsilon())
+#     def _loss(y_true, y_pred):
+#         dice_loss = 0
+#         for i in range(n_labels):
+#             dice_loss += 1-dice_coef(y_true[...,i], y_pred[...,i])
+#         return (dice_weight/n_labels)*dice_loss + _cce(y_true, y_pred)
+#     return _loss
+
+def dice_cce(cce_weights, dice_weight=1):
     _cce = weighted_cce(weights=cce_weights)
-    def _sum(a):
-        return K.sum(a, axis=(1,2), keepdims=True)
-    def dice_coef(y_true, y_pred):
-        return (2 * _sum(y_true * y_pred) + K.epsilon()) / (_sum(y_true) + _sum(y_pred) + K.epsilon())
     def _loss(y_true, y_pred):
-        dice_loss = 0
-        for i in range(n_labels):
-            dice_loss += 1-dice_coef(y_true[...,i], y_pred[...,i])
-        return (dice_weight/n_labels)*dice_loss + _cce(y_true, y_pred)
-    return _loss
+        inter = K.sum(y_true * y_pred, axis=(1,2)) + K.epsilon()
+        union = K.sum(y_true + y_pred, axis=(1,2)) + K.epsilon()
+        dice_loss = 1.-(2. * inter + K.epsilon()) / (union + K.epsilon())
+        return dice_weight*K.mean(dice_loss) + _cce(y_true, y_pred)
+    return _loss    
+
 
 def metric_precision(y_true, y_pred):
     y_pred = K.round(y_pred)
@@ -228,7 +240,7 @@ class UNet(CARE):
         elif self.config.train_loss=="categorical_crossentropy":
             loss = weighted_cce(self.config.train_class_weight)
         elif self.config.train_loss=="dice_cce":
-            loss = dice_cce(self.config.n_channel_out, self.config.train_class_weight, dice_weight=1)
+            loss = dice_cce(self.config.train_class_weight, dice_weight=1)
         else: 
             raise ValueError(f"Unknown loss function {self.config.train_loss}")
 
@@ -424,6 +436,7 @@ if __name__ == '__main__':
     conf = UNetConfig(n_dim=n_dim,
                       n_channel_in = 1,
                       n_channel_out=2,
+                      train_loss='dice_cce',
                       train_class_weight = (1,1))
 
     # model = UNet(conf, None, None)
@@ -436,6 +449,6 @@ if __name__ == '__main__':
     
     
     # and input 
-    X = Y[...,1:] + .1*np.random.normal(0,1,Y[...,1:].shape)
+    X = .1*Y[...,1:] + .2*np.random.normal(0,1,Y[...,1:].shape)
 
-    model.train(X,Y, X,Y, epochs = 4, steps_per_epoch=16)
+    model.train(X,Y, X,Y, epochs = 28, steps_per_epoch=16)
