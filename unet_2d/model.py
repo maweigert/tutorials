@@ -112,7 +112,7 @@ class UNetConfig(Config):
             and self.unet_input_shape[-1] == self.n_channel_in
             # and all((d is None or (_is_int(d) and d%(2**self.unet_n_depth)==0) for d in self.unet_input_shape[:-1]))
         )
-        ok['train_loss'] = self.train_loss in ('binary_crossentropy','categorical_crossentropy')
+        ok['train_loss'] = self.train_loss in ('binary_crossentropy','categorical_crossentropy','dice_cce')
         ok['train_epochs']          = _is_int(self.train_epochs,1)
         ok['train_steps_per_epoch'] = _is_int(self.train_steps_per_epoch,1)
         ok['train_learning_rate']   = np.isscalar(self.train_learning_rate) and self.train_learning_rate > 0
@@ -156,6 +156,19 @@ def dice_bce(bce_weights = (1,1), dice_weight=1):
     def _loss(y_true, y_pred):
         # return dice_loss(y_true, y_pred)
         return dice_weight*dice_loss(y_true, y_pred) + _bce(y_true, y_pred)
+    return _loss
+
+def dice_cce(n_labels, cce_weights, dice_weight=1):
+    _cce = weighted_cce(weights=cce_weights)
+    def _sum(a):
+        return K.sum(a, axis=(1,2), keepdims=True)
+    def dice_coef(y_true, y_pred):
+        return (2 * _sum(y_true * y_pred) + K.epsilon()) / (_sum(y_true) + _sum(y_pred) + K.epsilon())
+    def _loss(y_true, y_pred):
+        dice_loss = 0
+        for i in range(n_labels):
+            dice_loss += 1-dice_coef(y_true[...,i], y_pred[...,i])
+        return (dice_weight/n_labels)*dice_loss + _cce(y_true, y_pred)
     return _loss
 
 def metric_precision(y_true, y_pred):
@@ -214,6 +227,8 @@ class UNet(CARE):
             loss = dice_bce(bce_weights=self.config.train_class_weight, dice_weight=1)
         elif self.config.train_loss=="categorical_crossentropy":
             loss = weighted_cce(self.config.train_class_weight)
+        elif self.config.train_loss=="dice_cce":
+            loss = dice_cce(self.config.n_channel_out, self.config.train_class_weight, dice_weight=1)
         else: 
             raise ValueError(f"Unknown loss function {self.config.train_loss}")
 
