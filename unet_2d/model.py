@@ -5,6 +5,7 @@ A 2D Unet class with some goodies (eg. tiled prediction)
 
 import numpy as np
 import warnings
+import tensorflow as tf
 from csbdeep.models import CARE, Config
 from csbdeep.utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
 from csbdeep.data import PercentileNormalizer, PadAndCropResizer
