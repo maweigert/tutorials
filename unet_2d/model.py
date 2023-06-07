@@ -154,7 +154,7 @@ def dice_loss(y_true, y_pred):
     union = K.sum(y_true) + K.sum(y_pred)
     return 1.-(2. * intersection + K.epsilon()) / (union + K.epsilon())
 
-def dice_bce(bce_weights = (1,1), dice_weight=1): 
+def dice_bce(bce_weights = (1,1), dice_weight=0.5): 
     _bce = weighted_bce(weights=bce_weights)
     def _loss(y_true, y_pred):
         # return dice_loss(y_true, y_pred)
@@ -174,7 +174,7 @@ def dice_bce(bce_weights = (1,1), dice_weight=1):
 #         return (dice_weight/n_labels)*dice_loss + _cce(y_true, y_pred)
 #     return _loss
 
-def dice_cce(cce_weights, dice_weight=1):
+def dice_cce(cce_weights, dice_weight=0.5):
     _cce = weighted_cce(weights=cce_weights)
     def _loss(y_true, y_pred):
         inter = K.sum(y_true * y_pred, axis=(1,2)) + K.epsilon()
@@ -237,11 +237,11 @@ class UNet(CARE):
 
         if self.config.train_loss=="binary_crossentropy": 
             print("Using binary crossentropy loss")
-            loss = dice_bce(bce_weights=self.config.train_class_weight, dice_weight=1)
+            loss = dice_bce(bce_weights=self.config.train_class_weight, dice_weight=0.5)
         elif self.config.train_loss=="categorical_crossentropy":
             loss = weighted_cce(self.config.train_class_weight)
         elif self.config.train_loss=="dice_cce":
-            loss = dice_cce(self.config.train_class_weight, dice_weight=1)
+            loss = dice_cce(self.config.train_class_weight, dice_weight=0.5)
         else: 
             raise ValueError(f"Unknown loss function {self.config.train_loss}")
 
