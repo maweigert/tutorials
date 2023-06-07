@@ -260,7 +260,7 @@ class UNet(CARE):
                                                        n_images=3, prob_out=self.config.probabilistic))
 
         fit = self.keras_model.fit_generator if IS_TF_1 else self.keras_model.fit
-        history = fit(iter(self.data_train), validation_data=iter(self.data_val),
+        history = fit(iter(self.data_train), validation_data=(xv, yv),
                       epochs=epochs, steps_per_epoch=steps_per_epoch,
                       callbacks=self.callbacks, verbose=1)
         self._training_finished()
