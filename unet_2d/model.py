@@ -286,7 +286,7 @@ class UNet(CARE):
             self.callbacks.append(CARETensorBoardImage(model=self.keras_model, data=(xv, yv),
                                                        log_dir=str(self.logdir/'logs'/'images'),
                                                        n_images=3, prob_out=self.config.probabilistic,
-                                                       **({} if care_tb_kwargs is None else care_tb_kwargs))
+                                                       **({} if care_tb_kwargs is None else care_tb_kwargs)))
 
         fit = self.keras_model.fit_generator if IS_TF_1 else self.keras_model.fit
         history = fit(iter(self.data_train), validation_data=(xv, yv),
