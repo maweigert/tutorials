@@ -1,6 +1,6 @@
 """ 
 
-A 2D Unet class with some goodies (eg. tiled prediction)
+A 2D/3D Unet class with some goodies (eg. tiled prediction)
 """
 
 import numpy as np
@@ -57,7 +57,7 @@ class UNetConfig(Config):
             patch_size = (128,)*n_dim
             
         if train_loss is None:  
-            train_loss = "binary_crossentropy" if n_channel_out==1 else "categorical_crossentropy"             
+            train_loss = "dice_bce" if n_channel_out==1 else "dice_cce"             
             
         kwargs.setdefault("train_class_weight", (1,) * (2 if n_channel_out==1 else n_channel_out))
         kwargs.setdefault("axes", "XY" if n_dim==2 else "ZYX")
@@ -66,6 +66,7 @@ class UNetConfig(Config):
         kwargs.setdefault("n_channel_out", n_channel_out)
         kwargs.setdefault("unet_batch_norm", False)
         kwargs.setdefault("unet_dropout", 0.)
+        kwargs.setdefault("unet_n_depth", 4)
         kwargs.setdefault("patch_size", patch_size)
         
         if not len(kwargs['train_class_weight'])==(2 if n_channel_out==1 else n_channel_out):
@@ -115,7 +116,7 @@ class UNetConfig(Config):
             and self.unet_input_shape[-1] == self.n_channel_in
             # and all((d is None or (_is_int(d) and d%(2**self.unet_n_depth)==0) for d in self.unet_input_shape[:-1]))
         )
-        ok['train_loss'] = self.train_loss in ('binary_crossentropy','categorical_crossentropy','dice_cce')
+        ok['train_loss'] = self.train_loss in ('binary_crossentropy','categorical_crossentropy','dice_cce', 'dice_bce')
         ok['train_epochs']          = _is_int(self.train_epochs,1)
         ok['train_steps_per_epoch'] = _is_int(self.train_steps_per_epoch,1)
         ok['train_learning_rate']   = np.isscalar(self.train_learning_rate) and self.train_learning_rate > 0
@@ -176,12 +177,12 @@ def dice_bce(bce_weights = (1,1), dice_weight=0.5):
 
 def dice_cce(cce_weights, dice_weight=0.5):
     _cce = weighted_cce(weights=cce_weights)
-    def _loss(y_true, y_pred):
+    def _dice_cce_loss(y_true, y_pred):
         inter = K.sum(y_true * y_pred, axis=(1,2)) + K.epsilon()
         union = K.sum(y_true + y_pred, axis=(1,2)) + K.epsilon()
         dice_loss = 1.-(2. * inter + K.epsilon()) / (union + K.epsilon())
         return dice_weight*K.mean(dice_loss) + _cce(y_true, y_pred)
-    return _loss    
+    return _dice_cce_loss
 
 
 def metric_precision(y_true, y_pred):
@@ -237,9 +238,12 @@ class UNet(CARE):
 
         if self.config.train_loss=="binary_crossentropy": 
             print("Using binary crossentropy loss")
-            loss = dice_bce(bce_weights=self.config.train_class_weight, dice_weight=0.5)
+            loss = weighted_bce(self.config.train_class_weight)
         elif self.config.train_loss=="categorical_crossentropy":
             loss = weighted_cce(self.config.train_class_weight)
+        elif self.config.train_loss=="dice_bce": 
+            print("Using binary crossentropy loss")
+            loss = dice_bce(bce_weights=self.config.train_class_weight, dice_weight=0.5)
         elif self.config.train_loss=="dice_cce":
             loss = dice_cce(self.config.train_class_weight, dice_weight=0.5)
         else: 
